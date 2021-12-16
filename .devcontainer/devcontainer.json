@@ -19,7 +19,7 @@
 	"settings": {
 		"go.toolsManagement.checkForUpdates": "local",
 		"go.useLanguageServer": true,
-		"go.gopath": "/go",
+		"go.gopath": "/go:/workspaces/advent",
 		"go.goroot": "/usr/local/go"
 	},
 
