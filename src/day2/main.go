@@ -15,7 +15,7 @@ const (
 )
 
 type Craft struct {
-	x, y int
+	x, y, aim int
 }
 
 type Instruction struct {
@@ -35,16 +35,25 @@ func (craft *Craft) MoveY(distance int) {
 	craft.y += distance
 }
 
+func (craft *Craft) MoveForward(distance int) {
+	craft.MoveX(distance)
+	craft.MoveY(distance * craft.aim)
+}
+
+func (craft *Craft) AimAdjust(adjustment int) {
+	craft.aim += adjustment
+}
+
 func (craft *Craft) FollowInstruction(instruction Instruction) {
 	switch instruction.mode {
 	case FORWARD:
-		craft.MoveX(instruction.value)
+		craft.MoveForward(instruction.value)
 
 	case UP:
-		craft.MoveY(-1 * instruction.value)
+		craft.AimAdjust(-1 * instruction.value)
 
 	case DOWN:
-		craft.MoveY(instruction.value)
+		craft.AimAdjust(instruction.value)
 
 	default:
 		panic("Unrecognised instruction!")
@@ -69,7 +78,7 @@ func (craft *Craft) FollowRoute(routeFile string) {
 }
 
 func main() {
-	submarine := Craft{0, 0} // Submarine starts at the origin.
+	submarine := Craft{0, 0, 0} // Submarine starts at the origin with neutral aim
 	submarine.FollowRoute("files/route_plan.txt")
 	fmt.Println(submarine.GetEndPositionValue())
 }
