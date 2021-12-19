@@ -11,6 +11,8 @@ var ZERO = string("0")
 var ONE = string("1")
 
 type Node struct {
+	// TODO Need to have our own bitCounts for the values we possess. Do away with numBits, we can get it from our own
+	// bit counts once we have them.
 	values []string
 
 	// The particular "bit" this node is concerned with. Analagous with depth.
@@ -96,6 +98,8 @@ func (diagReport *DiagReport) initFromFile(filename string) {
 	utils.Check(err)
 	diagReport.reportLines = strings.Split(string(data), "\n")
 	numBits := len(diagReport.reportLines[0])
+
+	// TODO Move this after the bitCounts calculations, then pass bitCounts in. Will need recalculating at each node.
 	diagReport.rootNode = &Node{diagReport.reportLines, 0, numBits, nil, nil}
 	diagReport.rootNode.buildAllBelow()
 	// After the above we now have a binary tree accessible via the rootNode.
