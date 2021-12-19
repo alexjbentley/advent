@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"utils"
 )
 
 var ZERO = string("0")
 var ONE = string("1")
+var OXYGEN = true
+var CO2 = false
 
 type Node struct {
 	// TODO Need to have our own bitCounts for the values we possess. Do away with numBits, we can get it from our own
@@ -16,81 +19,99 @@ type Node struct {
 	values []string
 
 	// The particular "bit" this node is concerned with. Analagous with depth.
-	index, numBits int
-	left           *Node
-	right          *Node
+	index     int
+	bitCounts []int
+	left      *Node
+	right     *Node
+}
+
+func (node Node) filterValues(key string) (filtered []string) {
+	filtered = []string{}
+	for _, value := range node.values {
+		bit := strings.Split(value, "")[node.index]
+		if bit == key {
+			filtered = append(filtered, value)
+		}
+	}
+	return
+}
+
+func (node *Node) buildLeftNode() {
+	filteredValues := node.filterValues(ZERO)
+	fmt.Printf("Creating left node with values:\n")
+	fmt.Println(filteredValues)
+	if len(filteredValues) > 0 {
+		node.left = &Node{filteredValues, node.index + 1, node.bitCounts, nil, nil}
+		if len(filteredValues) > 1 {
+			node.left.buildAllBelow()
+		}
+	}
+}
+
+func (node *Node) buildRightNode() {
+	filteredValues := node.filterValues(ONE)
+	fmt.Printf("Creating right node with values:\n")
+	fmt.Println(filteredValues)
+	if len(filteredValues) > 0 {
+		node.right = &Node{filteredValues, node.index + 1, node.bitCounts, nil, nil}
+		if len(filteredValues) > 1 {
+			node.right.buildAllBelow()
+		}
+	}
 }
 
 // Recursively build all nodes below this one, based on the values
 func (node *Node) buildAllBelow() {
 	// TODO we shouldn't be storing any values in the non-leaf nodes. Memory efficiency!
-	if node.index == node.numBits || len(node.values) == 1 {
+	if node.index == len(node.bitCounts) || len(node.values) == 1 {
 		// We're the leaf of the tree, stop.
 		return
-	} else {
-		// Make left Node (0):
-		// Decide which values should go in it first
-		// TODO: make these two into a func
-		var workingValues []string
-		var bit string
-		for _, value := range node.values {
-			bit = strings.Split(value, "")[node.index]
-			if bit == ZERO {
-				workingValues = append(workingValues, value)
-			}
-		}
-
-		fmt.Printf("Creating left node with values:\n")
-		fmt.Println(workingValues)
-		if len(workingValues) > 0 {
-			node.left = &Node{workingValues, node.index + 1, node.numBits, nil, nil}
-			if len(workingValues) > 1 {
-				node.left.buildAllBelow()
-			}
-		}
-
-		workingValues = []string{}
-
-		// Make right Node (1):
-		// Decide which values should go in it first
-		for _, value := range node.values {
-			bit = strings.Split(value, "")[node.index]
-			if bit == ONE {
-				workingValues = append(workingValues, value)
-			}
-		}
-
-		fmt.Println("Creating right node with values:")
-		fmt.Println(workingValues)
-		if len(workingValues) > 0 {
-			node.right = &Node{workingValues, node.index + 1, node.numBits, nil, nil}
-			if len(workingValues) > 1 {
-				node.right.buildAllBelow()
-			}
-		}
 	}
+	// Make left Node (0):
+	node.buildLeftNode()
+
+	// Make right Node (1):
+	node.buildRightNode()
 }
 
-func (node Node) searchWithSequence(sequence []string) []string {
+func (node Node) search(mode bool) []string {
 	// Escape clause first!
-	fmt.Println("Node with following being searched: ")
-	fmt.Println(node.values)
+	fmt.Printf("OXYGEN: %t\nNode with following being searched:\n%v\n", mode, node.values)
 	// if len(node.values) == 1 || node.index == node.numBits-1 {
 	if len(node.values) == 1 {
 		return node.values
 	}
-	if sequence[node.index] == ONE {
-		return node.right.searchWithSequence(sequence)
+
+	positiveCount := 0
+	for _, value := range node.values {
+		valueTokens := strings.Split(value, "")
+		if valueTokens[node.index] == ONE {
+			positiveCount++
+		}
+	}
+	fmt.Printf("Positive count: %d\nTotal: %d\nDivided: %f\nMore than?: %t\n", positiveCount, len(node.values), float64(len(node.values))/2, float64(positiveCount) >= (float64(len(node.values)))/2)
+	if mode == OXYGEN {
+		// Mode is OXYGEN, look for the most common, preferring 1.
+		if float64(positiveCount) >= float64((len(node.values)))/2 {
+			return node.right.search(mode)
+		} else {
+			return node.left.search(mode)
+		}
 	} else {
-		return node.left.searchWithSequence(sequence)
+		// Mode is CO2, look for the least common, preferring 0.
+		if float64(positiveCount) >= float64((len(node.values)))/2 {
+			return node.left.search(mode)
+		} else {
+			return node.right.search(mode)
+		}
 	}
 }
 
 type DiagReport struct {
-	gammaRate, epsilonRate, oxygenRating, co2Rating, lifeSupportRating int
-	reportLines                                                        []string
-	rootNode                                                           *Node
-	bitCounts                                                          []int
+	gammaRate, epsilonRate int
+	reportLines            []string
+	rootNode               *Node
+	bitCounts              []int
 }
 
 func (diagReport *DiagReport) initFromFile(filename string) {
@@ -98,11 +119,6 @@ func (diagReport *DiagReport) initFromFile(filename string) {
 	utils.Check(err)
 	diagReport.reportLines = strings.Split(string(data), "\n")
 	numBits := len(diagReport.reportLines[0])
-
-	// TODO Move this after the bitCounts calculations, then pass bitCounts in. Will need recalculating at each node.
-	diagReport.rootNode = &Node{diagReport.reportLines, 0, numBits, nil, nil}
-	diagReport.rootNode.buildAllBelow()
-	// After the above we now have a binary tree accessible via the rootNode.
 
 	// Intialise our slice to be zeroed
 	diagReport.bitCounts = make([]int, numBits)
@@ -122,6 +138,10 @@ func (diagReport *DiagReport) initFromFile(filename string) {
 			}
 		}
 	}
+
+	diagReport.rootNode = &Node{diagReport.reportLines, 0, diagReport.bitCounts, nil, nil}
+	diagReport.rootNode.buildAllBelow()
+	// After the above we now have a binary tree accessible via the rootNode.
 }
 
 func (diagReport *DiagReport) calculateGammaRate() {
@@ -148,22 +168,6 @@ func (diagReport DiagReport) getPowerConsumption() int {
 	return diagReport.gammaRate * diagReport.epsilonRate
 }
 
-func (diagReport DiagReport) constructSearchSequences() (oxygenSequence []string, co2Sequence []string) {
-	oxygenSequence, co2Sequence = make([]string, 0), make([]string, 0)
-	reportLength := len(diagReport.reportLines)
-	numBits := len(diagReport.bitCounts)
-	for i := 0; i < numBits; i++ {
-		if diagReport.bitCounts[i] >= reportLength/2 {
-			oxygenSequence = append(oxygenSequence, ONE)
-			co2Sequence = append(co2Sequence, ZERO)
-		} else {
-			oxygenSequence = append(oxygenSequence, ZERO)
-			co2Sequence = append(co2Sequence, ONE)
-		}
-	}
-	return
-}
-
 func main() {
 	diagReport := DiagReport{}
 	diagReport.initFromFile(os.Args[1])
@@ -176,12 +180,18 @@ func main() {
 
 	fmt.Printf("Power consumption: %d\n", diagReport.getPowerConsumption())
 
-	oxygenSearchSequence, co2SearchSequence := diagReport.constructSearchSequences()
-	fmt.Printf("About to search with sequences:\nOxygen: %v\nCO2: %v\n", oxygenSearchSequence, co2SearchSequence)
+	oxygenValue := diagReport.rootNode.search(OXYGEN)[0]
+	co2Value := diagReport.rootNode.search(CO2)[0]
+	fmt.Println(oxygenValue)
+	fmt.Println(co2Value)
 
-	// Hopefully both of these have returned only one value. Beware of duplicates?
-	oxygenValues := diagReport.rootNode.searchWithSequence(oxygenSearchSequence)
-	co2Values := diagReport.rootNode.searchWithSequence(co2SearchSequence)
-	fmt.Println(oxygenValues)
-	fmt.Println(co2Values)
+	oxygenRating, err := strconv.ParseInt(oxygenValue, 2, 64)
+	utils.Check(err)
+
+	co2Rating, err := strconv.ParseInt(co2Value, 2, 64)
+	utils.Check(err)
+
+	lifeSupportRating := oxygenRating * co2Rating
+
+	fmt.Printf("Oxygen Rating: %d\nCO2 Rating: %d\nLife Support: %d\n", oxygenRating, co2Rating, lifeSupportRating)
 }
