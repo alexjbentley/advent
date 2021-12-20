@@ -89,7 +89,6 @@ func (node Node) search(mode bool) []string {
 			positiveCount++
 		}
 	}
-	fmt.Printf("Positive count: %d\nTotal: %d\nDivided: %f\nMore than?: %t\n", positiveCount, len(node.values), float64(len(node.values))/2, float64(positiveCount) >= (float64(len(node.values)))/2)
 	if mode == OXYGEN {
 		// Mode is OXYGEN, look for the most common, preferring 1.
 		if float64(positiveCount) >= float64((len(node.values)))/2 {
